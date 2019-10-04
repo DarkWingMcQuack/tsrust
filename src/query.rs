@@ -2,7 +2,8 @@ use base64::{decode, encode};
 use hmac::{Hmac, Mac};
 use rand;
 use reqwest;
-use reqwest::header::{Authorization, ContentType, Headers, UserAgent};
+// use reqwest::header::{Authorization, ContentType, Headers, UserAgent};
+use reqwest::header::*;
 use serde_json::to_string;
 use sha2::Sha512;
 use strum::AsStaticRef;
@@ -47,7 +48,8 @@ impl Client {
             self.api_url,
             query.kind.as_static().to_lowercase(),
             query.endpoint
-        ).to_owned();
+        )
+        .to_owned();
         match query.kind {
             Api::Public => {
                 match query.params {
@@ -57,8 +59,7 @@ impl Client {
                 reqwest::get(&url)
             }
             Api::Private => {
-                let headers: Headers =
-                    self.generate_header(&query.params.as_ref().unwrap(), url.clone());
+                let headers = self.generate_header(&query.params.as_ref().unwrap(), url.clone());
                 let params = &query.params.unwrap();
                 let client = reqwest::Client::new();
                 let response = client.post(&url).json(params).headers(headers).send();
@@ -67,7 +68,7 @@ impl Client {
         }
     }
 
-    fn generate_header(&self, params: &Params, url: String) -> Headers {
+    fn generate_header(&self, params: &Params, url: String) -> HeaderMap {
         let url_encoded: String = byte_serialize(&url.as_bytes()).collect();
         let post_params = &to_string(&params).unwrap();
         let randn: f64 = rand::random();
@@ -85,13 +86,20 @@ impl Client {
         mac.input(&signature.as_bytes());
         let hmac_sign = encode(&mac.result().code());
 
+
+        let mut headers = HeaderMap::new();
+
+        let json_content = HeaderValue::from_static("application/json");
+        let user_agent =
+            HeaderValue::from_static("Mozilla/4.0 (compatible; TradeSatoshi API Rust client)");
+
         let header: String = format!("Basic {}:{}:{}", self.api_key, hmac_sign, &nonce);
-        let mut headers = Headers::new();
-        headers.set(ContentType::json());
-        headers.set(Authorization(header));
-        headers.set(UserAgent::new(
-            "Mozilla/4.0 (compatible; TradeSatoshi API Rust client)",
-        ));
+		let authorization = HeaderValue::from_str(&header)
+			.expect("authorization string needs to be valid");
+
+        headers.insert(CONTENT_TYPE, json_content);
+		headers.insert(USER_AGENT, user_agent);
+		headers.insert(AUTHORIZATION, authorization);
         headers
     }
 
@@ -133,7 +141,8 @@ impl Client {
 
     /// Get currencies
     pub fn get_currencies(&self) -> Result<Vec<Currency>> {
-        let mut resp = self.run(Query::new("getcurrencies".to_string(), Api::Public))
+        let mut resp = self
+            .run(Query::new("getcurrencies".to_string(), Api::Public))
             .unwrap();
         let data: APIVecResult<Currency> = resp.json().unwrap();
         self.check_vec_response(data)
@@ -143,9 +152,12 @@ impl Client {
     ///
     /// market: The market name e.g. 'LTC_BTC' (required)
     pub fn get_ticker(&self, market: String) -> Result<Ticker> {
-        let mut resp = self.run(
-            Query::new("getticker".to_string(), Api::Public).params(Params::new().market(market)),
-        ).unwrap();
+        let mut resp = self
+            .run(
+                Query::new("getticker".to_string(), Api::Public)
+                    .params(Params::new().market(market)),
+            )
+            .unwrap();
         let data: APIResult<Ticker> = resp.json().unwrap();
         self.check_single_response(data)
     }
@@ -159,10 +171,12 @@ impl Client {
             Some(val) => val,
             None => 20,
         };
-        let mut resp = self.run(
-            Query::new("getmarkethistory".to_string(), Api::Public)
-                .params(Params::new().market(market).count(count)),
-        ).unwrap();
+        let mut resp = self
+            .run(
+                Query::new("getmarkethistory".to_string(), Api::Public)
+                    .params(Params::new().market(market).count(count)),
+            )
+            .unwrap();
         let data: APIVecResult<Trade> = resp.json().unwrap();
         self.check_vec_response(data)
     }
@@ -171,17 +185,20 @@ impl Client {
     ///
     /// market: The market name e.g. 'LTC_BTC' (required)
     pub fn get_market_summary(&self, market: String) -> Result<MarketSummary> {
-        let mut resp = self.run(
-            Query::new("getmarketsummary".to_string(), Api::Public)
-                .params(Params::new().market(market)),
-        ).unwrap();
+        let mut resp = self
+            .run(
+                Query::new("getmarketsummary".to_string(), Api::Public)
+                    .params(Params::new().market(market)),
+            )
+            .unwrap();
         let data: APIResult<MarketSummary> = resp.json().unwrap();
         self.check_single_response(data)
     }
 
     /// Get market summaries
     pub fn get_market_summaries(&self) -> Result<Vec<MarketSummary>> {
-        let mut resp = self.run(Query::new("getmarketsummaries".to_string(), Api::Public))
+        let mut resp = self
+            .run(Query::new("getmarketsummaries".to_string(), Api::Public))
             .unwrap();
         let data: APIVecResult<MarketSummary> = resp.json().unwrap();
         self.check_vec_response(data)
@@ -206,10 +223,12 @@ impl Client {
             Some(val) => val,
             None => 20,
         };
-        let mut resp = self.run(
-            Query::new("getorderbook".to_string(), Api::Public)
-                .params(Params::new().market(market).typeo(typeo).depth(depth)),
-        ).unwrap();
+        let mut resp = self
+            .run(
+                Query::new("getorderbook".to_string(), Api::Public)
+                    .params(Params::new().market(market).typeo(typeo).depth(depth)),
+            )
+            .unwrap();
         let data: APIResult<PublicOrderBook> = resp.json().unwrap();
         self.check_single_response(data)
     }
@@ -222,19 +241,21 @@ impl Client {
     ///
     /// currency: The currency of the balance to return e.g. 'BTC' (required)
     pub fn get_balance(&self, currency: String) -> Result<Balance> {
-        let mut resp = self.run(
-            Query::new("getbalance".to_string(), Api::Private)
-                .params(Params::new().currency(currency)),
-        ).unwrap();
+        let mut resp = self
+            .run(
+                Query::new("getbalance".to_string(), Api::Private)
+                    .params(Params::new().currency(currency)),
+            )
+            .unwrap();
         let data: APIResult<Balance> = resp.json().unwrap();
         self.check_single_response(data)
     }
 
     /// Get balances
     pub fn get_balances(&self) -> Result<Vec<Balance>> {
-        let mut resp = self.run(
-            Query::new("getbalances".to_string(), Api::Private).params(Params::new()),
-        ).unwrap();
+        let mut resp = self
+            .run(Query::new("getbalances".to_string(), Api::Private).params(Params::new()))
+            .unwrap();
         let data: APIVecResult<Balance> = resp.json().unwrap();
         self.check_vec_response(data)
     }
@@ -243,9 +264,12 @@ impl Client {
     ///
     /// orderid: The order to return (required)
     pub fn get_order(&self, orderid: u32) -> Result<Order> {
-        let mut resp = self.run(
-            Query::new("getorder".to_string(), Api::Private).params(Params::new().orderid(orderid)),
-        ).unwrap();
+        let mut resp = self
+            .run(
+                Query::new("getorder".to_string(), Api::Private)
+                    .params(Params::new().orderid(orderid)),
+            )
+            .unwrap();
         let data: APIResult<Order> = resp.json().unwrap();
         self.check_single_response(data)
     }
@@ -263,10 +287,12 @@ impl Client {
             Some(val) => val,
             None => 20,
         };
-        let mut resp = self.run(
-            Query::new("getorders".to_string(), Api::Private)
-                .params(Params::new().market(market).count(count)),
-        ).unwrap();
+        let mut resp = self
+            .run(
+                Query::new("getorders".to_string(), Api::Private)
+                    .params(Params::new().market(market).count(count)),
+            )
+            .unwrap();
         let data: APIVecResult<Order> = resp.json().unwrap();
         self.check_vec_response(data)
     }
@@ -284,15 +310,17 @@ impl Client {
         amount: f32,
         price: f32,
     ) -> Result<SubmitOrder> {
-        let mut resp = self.run(
-            Query::new("submitorder".to_string(), Api::Private).params(
-                Params::new()
-                    .market(market)
-                    .typeo(typeo)
-                    .amount(amount)
-                    .price(price),
-            ),
-        ).unwrap();
+        let mut resp = self
+            .run(
+                Query::new("submitorder".to_string(), Api::Private).params(
+                    Params::new()
+                        .market(market)
+                        .typeo(typeo)
+                        .amount(amount)
+                        .price(price),
+                ),
+            )
+            .unwrap();
         let data: APIResult<SubmitOrder> = resp.json().unwrap();
         self.check_single_response(data)
     }
@@ -318,7 +346,8 @@ impl Client {
             None => params,
         };
 
-        let mut resp = self.run(Query::new("cancelorder".to_string(), Api::Private).params(params))
+        let mut resp = self
+            .run(Query::new("cancelorder".to_string(), Api::Private).params(params))
             .unwrap();
         let data: APIResult<CancelOrder> = resp.json().unwrap();
         self.check_single_response(data)
@@ -347,10 +376,12 @@ impl Client {
             Some(val) => val,
             None => 0,
         };
-        let mut resp = self.run(
-            Query::new("gettradehistory".to_string(), Api::Private)
-                .params(Params::new().market(market).count(count).page_num(page_num)),
-        ).unwrap();
+        let mut resp = self
+            .run(
+                Query::new("gettradehistory".to_string(), Api::Private)
+                    .params(Params::new().market(market).count(count).page_num(page_num)),
+            )
+            .unwrap();
         let data: APIVecResult<TradeHistory> = resp.json().unwrap();
         self.check_vec_response(data)
     }
@@ -359,10 +390,12 @@ impl Client {
     ///
     /// currency: The currency to generate address for e.g. 'BTC' (required)
     pub fn generate_address(&self, currency: String) -> Result<Address> {
-        let mut resp = self.run(
-            Query::new("generateaddress".to_string(), Api::Private)
-                .params(Params::new().currency(currency)),
-        ).unwrap();
+        let mut resp = self
+            .run(
+                Query::new("generateaddress".to_string(), Api::Private)
+                    .params(Params::new().currency(currency)),
+            )
+            .unwrap();
         let data: APIResult<Address> = resp.json().unwrap();
         self.check_single_response(data)
     }
@@ -373,14 +406,16 @@ impl Client {
     /// address: The receiving address (required)
     /// amount: The amount to withdraw (required)
     pub fn submit_withdraw(&self, currency: String, address: String, amount: f32) -> Result<Id> {
-        let mut resp = self.run(
-            Query::new("gettradehistory".to_string(), Api::Private).params(
-                Params::new()
-                    .currency(currency)
-                    .address(address)
-                    .amount(amount),
-            ),
-        ).unwrap();
+        let mut resp = self
+            .run(
+                Query::new("gettradehistory".to_string(), Api::Private).params(
+                    Params::new()
+                        .currency(currency)
+                        .address(address)
+                        .amount(amount),
+                ),
+            )
+            .unwrap();
         let data: APIResult<Id> = resp.json().unwrap();
         self.check_single_response(data)
     }
@@ -402,10 +437,12 @@ impl Client {
             Some(val) => val,
             None => 20,
         };
-        let mut resp = self.run(
-            Query::new("gettradehistory".to_string(), Api::Private)
-                .params(Params::new().currency(currency).count(count)),
-        ).unwrap();
+        let mut resp = self
+            .run(
+                Query::new("gettradehistory".to_string(), Api::Private)
+                    .params(Params::new().currency(currency).count(count)),
+            )
+            .unwrap();
         let data: APIVecResult<Transaction> = resp.json().unwrap();
         self.check_vec_response(data)
     }
@@ -427,10 +464,12 @@ impl Client {
             Some(val) => val,
             None => 20,
         };
-        let mut resp = self.run(
-            Query::new("gettradehistory".to_string(), Api::Private)
-                .params(Params::new().currency(currency).count(count)),
-        ).unwrap();
+        let mut resp = self
+            .run(
+                Query::new("gettradehistory".to_string(), Api::Private)
+                    .params(Params::new().currency(currency).count(count)),
+            )
+            .unwrap();
         let data: APIVecResult<Transaction> = resp.json().unwrap();
         self.check_vec_response(data)
     }
@@ -446,14 +485,16 @@ impl Client {
         username: String,
         amount: f32,
     ) -> Result<SubmitTransfer> {
-        let mut resp = self.run(
-            Query::new("gettradehistory".to_string(), Api::Private).params(
-                Params::new()
-                    .currency(currency)
-                    .username(username)
-                    .amount(amount),
-            ),
-        ).unwrap();
+        let mut resp = self
+            .run(
+                Query::new("gettradehistory".to_string(), Api::Private).params(
+                    Params::new()
+                        .currency(currency)
+                        .username(username)
+                        .amount(amount),
+                ),
+            )
+            .unwrap();
         let data: APIResult<SubmitTransfer> = resp.json().unwrap();
         self.check_single_response(data)
     }
