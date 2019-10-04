@@ -2,7 +2,6 @@ use base64::{decode, encode};
 use hmac::{Hmac, Mac};
 use rand;
 use reqwest;
-// use reqwest::header::{Authorization, ContentType, Headers, UserAgent};
 use reqwest::header::*;
 use serde_json::to_string;
 use sha2::Sha512;
